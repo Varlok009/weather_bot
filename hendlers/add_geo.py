@@ -13,7 +13,8 @@ import json
 
 
 class AddGeo(StatesGroup):
-    #  Класс содержащий состояния, необходимые для добавления и сохранения геолокаций
+    """Класс содержащий состояния, необходимые для добавления и сохранения геолокаций"""
+
     loc_number = State()
     name_location = State()
     lat = State()
@@ -21,20 +22,29 @@ class AddGeo(StatesGroup):
 
 
 async def choice_location(message: types.Message):
+    """Выгружает из БД текущие сохраненные данные локаций. Добавляет их в иноайн клавиатуру."""
+
     await bot.delete_message(message.from_user.id, message.message_id)
     db = BaseUserTg(DATABASE)
-    # Выгружает из БД кортеж json'ов, преобразует в список словарей
-    locations = [json.loads(s) for s in db.get_user_location(message.from_user.id)]
 
+    # Выгружает из БД кортеж c геоданными локаций, преобразует в список словарей, если геоднанные присутсвуют
+    locations = db.get_user_location(message.from_user.id)
+    locations = [json.loads(s) if s else None for s in locations]
+
+    # Создает инлайн клавиатуру и кнопки из всех полученных геоданных
     keyboard_save_location = InlineKeyboardMarkup()
-    buttons_loc = [InlineKeyboardButton(f"{loc['name_location']}", callback_data=f'save_loc{str(ind)}')
-                                        for ind, loc in enumerate(locations)]
+    buttons_loc = [InlineKeyboardButton(f"{loc['name_location']}", callback_data=f"save_loc{ind}") if loc
+                   else InlineKeyboardButton("пусто", callback_data=f"save_loc{ind}")
+                   for ind, loc in enumerate(locations)]
     keyboard_save_location.row(*buttons_loc)
+
     await bot.send_message(message.from_user.id, 'Выберите ячеку, которую хотите изменить',
                            reply_markup=keyboard_save_location)
 
-#  Запускаем машину состояний
+
 async def start_add_geo(callback: types.CallbackQuery, state=None):
+    """Запускает машину состояний"""
+
     await AddGeo.loc_number.set()
     async with state.proxy() as data:
         data['loc_number'] = f"place{str(int(callback.data[-1]) + 1)}"
@@ -43,17 +53,19 @@ async def start_add_geo(callback: types.CallbackQuery, state=None):
     await bot.send_message(callback.from_user.id, 'Напиши название локации', reply_markup=kb_exit)
 
 
-#  Выход из состояния
 async def cancel_state(callback: types.CallbackQuery, state=FSMContext):
+    """Выводит из состояния"""
+
     current_state = await state.get_state()
     if not current_state:
         return
     await state.finish()
-    await bot.send_message(callback.from_user.id, 'Процесс добавления прерван пользователем')
+    await bot.send_message(callback.from_user.id, 'Процесс изменения ячейки прерван пользователем')
 
 
-#  Сохраняем название локации и id пользователя в словарь
 async def save_name_location(message: types.Message, state=FSMContext):
+    """Сохраняет название локации и id пользователя в словарь"""
+
     async with state.proxy() as data:
         data['user_id'] = message.from_user.id
         data['name_location'] = message.text
@@ -61,8 +73,9 @@ async def save_name_location(message: types.Message, state=FSMContext):
     await message.reply('Теперь введи значение широты', reply_markup=kb_exit)
 
 
-#  Сохраняем значение широты локации в словарь
 async def save_lat_location(message: types.Message, state=FSMContext):
+    """Сохраняет значение широты локации в словарь, если оно прошло валидацию"""
+
     if not lat_validator(message.text):
         await message.reply('Значение широты введено неверно, значение должно быть в интервале от -90 до 90, '
                             'в качестве разделителя необходимо использовать символ точки ".". Попробуйте еще раз.')
@@ -73,8 +86,10 @@ async def save_lat_location(message: types.Message, state=FSMContext):
         await message.reply('Теперь введи значение долготы', reply_markup=kb_exit)
 
 
-#  Сохраняем значение долготы локации в словарь
 async def save_lon_location(message: types.Message, state=FSMContext):
+    """Сохраняет значение долготы локации в словарь, если оно прошло валидацию.
+    Отправляет результирующий словарь на запись в БД"""
+
     if not lon_validator(message.text):
         await message.reply('Значение долготы введено неверно, значение должно быть в интервале от -180 до 180, '
                             'в качестве разделителя необходимо использовать символ точки "."ю Попробуйте еще раз.')
@@ -84,12 +99,10 @@ async def save_lon_location(message: types.Message, state=FSMContext):
         db = BaseUserTg(DATABASE)
         async with state.proxy() as data:
             data_dict = dict(zip(data.keys(), data.values()))
-            try:
-                db.add_user_place(data_dict)
-                await bot.send_message(message.from_user.id, f'Поздравляем, новая локация с именем '
+
+            db.add_user_place(data_dict)
+            await bot.send_message(message.from_user.id, f'Поздравляем, новая локация с именем '
                                                              f'{data["name_location"]} сохранена!')
-            except:
-                await bot.send_message(message.from_user.id, 'Не удалось сохранить новую локацию, попробуйте позже.')
 
         await state.finish()
 

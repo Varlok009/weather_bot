@@ -32,19 +32,37 @@ async def get_current_geo(message: types.location):
 
 
 async def choice_save_geo(message: types.Message):
-    # """""""
+    """Отправляет в инлайн клавиатуре сохраненные локации.
+        При их отсутствии - предлагает создать новые."""
     await bot.delete_message(message.from_user.id, message.message_id)
     db = BaseUserTg(DATABASE)
     # Выгружает из БД кортеж json'ов, преобразует в список словарей
-    locations = [json.loads(s) for s in db.get_user_location(message.from_user.id)]
+    locations = db.get_user_location(message.from_user.id)
 
-    keyboard_save_location = InlineKeyboardMarkup()
-    button_loc1 = InlineKeyboardButton(f"{locations[0]['name_location']}", callback_data="get_loc0")
-    button_loc2 = InlineKeyboardButton(f"{locations[1]['name_location']}", callback_data="get_loc1")
-    keyboard_save_location.row(button_loc1, button_loc2)
+    if all([location is None for location in locations]):
+        await bot.send_message(message.from_user.id, 'Сохраненных локаций еще нет, используйте команду /add_place')
+    else:
+        locations = [json.loads(s) if s else None for s in locations]
+        keyboard_save_location = InlineKeyboardMarkup()
+        # button_loc1 = InlineKeyboardButton(f"{locations[0]['name_location']}", callback_data="get_loc0")
+        # button_loc2 = InlineKeyboardButton(f"{locations[1]['name_location']}", callback_data="get_loc1")
+        buttons_loc = [InlineKeyboardButton(f"{loc['name_location']}", callback_data=f"get_loc{ind}") if loc
+                       else InlineKeyboardButton("пусто", callback_data="none_loc")
+                       for ind, loc in enumerate(locations)]
+        keyboard_save_location.row(*buttons_loc)
 
-    await bot.send_message(message.from_user.id, 'Выберите сохраненную локацию', reply_markup=keyboard_save_location)
-    # await bot.send_message(message.from_user.id, locations)
+        await bot.send_message(message.from_user.id, 'Выберите сохраненную локацию', reply_markup=keyboard_save_location)
+
+    # locations = [json.loads(s) for s in db.get_user_location(message.from_user.id)]
+    # if all([locations[0]['name_location'] == 'пусто', locations[1]['name_location'] == 'пусто']):
+    #     await bot.send_message(message.from_user.id, 'Сохраненных локаций еще нет, используйте команду /add_place')
+    # else:
+    #     keyboard_save_location = InlineKeyboardMarkup()
+    #     button_loc1 = InlineKeyboardButton(f"{locations[0]['name_location']}", callback_data="get_loc0")
+    #     button_loc2 = InlineKeyboardButton(f"{locations[1]['name_location']}", callback_data="get_loc1")
+    #     keyboard_save_location.row(button_loc1, button_loc2)
+    #
+    #     await bot.send_message(message.from_user.id, 'Выберите сохраненную локацию', reply_markup=keyboard_save_location)
 
 
 def register_handlers_client(dp: Dispatcher):

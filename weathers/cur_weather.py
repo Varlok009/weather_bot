@@ -18,7 +18,7 @@ def get_cur_weather(lat, lon):
     if r.json()['wind']['deg'] > 337.5: wind = 'северный'
     elif r.json()['wind']['deg'] > 292.5: wind = 'северо-западный'
     elif r.json()['wind']['deg'] > 247.5: wind = 'западный'
-    elif r.json()['wind']['deg'] > 202.5: wind = 'бго-западный'
+    elif r.json()['wind']['deg'] > 202.5: wind = 'юго-западный'
     elif r.json()['wind']['deg'] > 157.5: wind = 'южный'
     elif r.json()['wind']['deg'] > 122.5: wind = 'юго-восточный'
     elif r.json()['wind']['deg'] > 67.5: wind = 'восточный'
